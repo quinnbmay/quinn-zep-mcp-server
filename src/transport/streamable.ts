@@ -33,7 +33,7 @@ export class StreamableHttpTransport extends EventEmitter {
         if (!origin) return callback(null, true);
         
         const allowedOrigins = config.transport.allowedOrigins;
-        const isAllowed = allowedOrigins.some(allowed => {
+        const isAllowed = allowedOrigins.some((allowed: string) => {
           if (allowed.endsWith('*')) {
             const prefix = allowed.slice(0, -1);
             return origin.startsWith(prefix);
