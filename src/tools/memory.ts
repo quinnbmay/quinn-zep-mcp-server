@@ -1,8 +1,8 @@
-import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { Tool } from '@modelcontextprotocol/sdk/types';
 import { z } from 'zod';
-import { RailwayApiClient } from '../clients/railway-api.js';
+import { ZepClient } from '../clients/zep-client.js';
 
-const railwayClient = new RailwayApiClient();
+const zepClient = new ZepClient();
 
 export const storeMemoryTool: Tool = {
   name: 'store-memory',
@@ -30,16 +30,12 @@ export async function handleStoreMemory(args: any) {
     metadata: z.record(z.any()).optional(),
   }).parse(args);
 
-  const response = await railwayClient.storeMemory(content, metadata);
-  
-  if (!response.success) {
-    throw new Error(`Failed to store memory: ${response.error}`);
-  }
-
+  // Note: Store memory functionality would need to be implemented in ZepClient
+  // For now, return success message
   return {
     content: [{
       type: 'text',
-      text: `Memory stored successfully: ${JSON.stringify(response.data, null, 2)}`,
+      text: `Memory storage functionality not yet implemented in Zep client integration.`,
     }],
   };
 }
@@ -70,7 +66,7 @@ export async function handleSearchMemory(args: any) {
     limit: z.number().optional().default(10),
   }).parse(args);
 
-  const response = await railwayClient.searchMemory(query, limit);
+  const response = await zepClient.searchMemory(query, limit);
   
   if (!response.success) {
     throw new Error(`Failed to search memories: ${response.error}`);
@@ -104,7 +100,7 @@ export async function handleGetUserContext(args: any) {
     user_id: z.string().optional(),
   }).parse(args);
 
-  const response = await railwayClient.getUserContext(user_id);
+  const response = await zepClient.getUserContext(user_id);
   
   if (!response.success) {
     throw new Error(`Failed to get user context: ${response.error}`);

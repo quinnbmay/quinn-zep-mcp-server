@@ -1,8 +1,8 @@
-import { Resource } from '@modelcontextprotocol/sdk/types.js';
-import { RailwayApiClient } from '../clients/railway-api.js';
+import { Resource } from '@modelcontextprotocol/sdk/types';
+import { ZepClient } from '../clients/zep-client.js';
 import { config } from '../config/env.js';
 
-const railwayClient = new RailwayApiClient();
+const zepClient = new ZepClient();
 
 export const contextResource: Resource = {
   uri: `memory://${config.api.defaultUserId}/context`,
@@ -12,7 +12,7 @@ export const contextResource: Resource = {
 };
 
 export async function getContextResource() {
-  const response = await railwayClient.getUserContext();
+  const response = await zepClient.getUserContext();
   
   if (!response.success) {
     throw new Error(`Failed to get context: ${response.error}`);
@@ -35,7 +35,7 @@ export const recentMemoriesResource: Resource = {
 };
 
 export async function getRecentMemoriesResource() {
-  const response = await railwayClient.searchMemory('', 10);
+  const response = await zepClient.searchMemory('', 10);
   
   if (!response.success) {
     throw new Error(`Failed to get recent memories: ${response.error}`);
@@ -58,8 +58,8 @@ export const statsResource: Resource = {
 };
 
 export async function getStatsResource() {
-  const contextResponse = await railwayClient.getUserContext();
-  const healthResponse = await railwayClient.healthCheck();
+  const contextResponse = await zepClient.getUserContext();
+  const healthResponse = await zepClient.healthCheck();
   
   const stats = {
     context: contextResponse.data,
