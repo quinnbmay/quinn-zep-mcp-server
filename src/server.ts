@@ -1,12 +1,18 @@
 import { StreamableHttpTransport } from './transport/streamable.js';
+import { McpHttpHandler } from './transport/mcp-http-handler.js';
 import { config } from './config/env.js';
 
 export class ExpressServer {
   private transport: StreamableHttpTransport;
+  private mcpHandler: McpHttpHandler;
   private server: any;
 
   constructor() {
     this.transport = new StreamableHttpTransport();
+    this.mcpHandler = new McpHttpHandler();
+    
+    // Connect the MCP handler to the transport
+    this.transport.setRequestHandler((request) => this.mcpHandler.handleRequest(request));
   }
 
   public async start(): Promise<void> {
