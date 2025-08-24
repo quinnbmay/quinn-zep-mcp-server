@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/env.js';
+import { EventEmitter } from 'events';
 
 export interface Session {
   id: string;
@@ -10,12 +11,14 @@ export interface Session {
   requests: Set<express.Response>;
 }
 
-export class StreamableHttpTransport {
+export class StreamableHttpTransport extends EventEmitter {
   private app: express.Application;
   private sessions: Map<string, Session> = new Map();
   private sessionCleanupInterval: NodeJS.Timeout | undefined;
+  private requestHandler: ((request: any) => Promise<any>) | null = null;
 
   constructor() {
+    super();
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
@@ -117,19 +120,89 @@ export class StreamableHttpTransport {
     return this.createSession();
   }
 
-  private handleMcpRequest(req: express.Request, res: express.Response) {
+  private async handleMcpRequest(req: express.Request, res: express.Response) {
     const sessionId = req.headers['x-session-id'] as string;
     const session = this.getOrCreateSession(sessionId);
     
     // Add session ID to response headers
     res.setHeader('X-Session-ID', session.id);
     
-    // Process MCP request (will be handled by MCP server)
-    res.json({
-      sessionId: session.id,
-      received: true,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      // Validate JSON-RPC 2.0 request
+      const { jsonrpc, method, params, id } = req.body;
+      
+      if (jsonrpc !== '2.0') {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32600,
+            message: 'Invalid Request: Missing or invalid jsonrpc version'
+          },
+          id: id || null
+        });
+        return;
+      }
+      
+      if (!method || typeof method !== 'string') {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32600,
+            message: 'Invalid Request: Missing or invalid method'
+          },
+          id: id || null
+        });
+        return;
+      }
+      
+      // Process the request through the handler
+      if (this.requestHandler) {
+        const result = await this.requestHandler({
+          jsonrpc,
+          method,
+          params: params || {},
+          id
+        });
+        
+        // Send JSON-RPC 2.0 response
+        res.json({
+          jsonrpc: '2.0',
+          result,
+          id
+        });
+      } else {
+        // No handler registered
+        res.status(503).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Internal error: No request handler available'
+          },
+          id: id || null
+        });
+      }
+      
+      // Broadcast to SSE clients if needed
+      for (const sseRes of session.requests) {
+        sseRes.write(`data: ${JSON.stringify({
+          type: 'request',
+          method,
+          sessionId: session.id,
+          timestamp: new Date().toISOString()
+        })}\n\n`);
+      }
+      
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: `Internal error: ${message}`
+        },
+        id: req.body?.id || null
+      });
+    }
   }
 
   private handleMcpStream(req: express.Request, res: express.Response) {
@@ -193,6 +266,10 @@ export class StreamableHttpTransport {
 
   public getApp(): express.Application {
     return this.app;
+  }
+
+  public setRequestHandler(handler: (request: any) => Promise<any>) {
+    this.requestHandler = handler;
   }
 
   public close() {
